@@ -1,4 +1,4 @@
-# Stellar Blade debug port
+# Stellar Blade port
 
 This port uses current RE-UE4SS and its pinned UEPseudo/patternsleuth dependencies.
 The game profile is in `assets/CustomGameConfigs/Stellar Blade`.
@@ -13,7 +13,17 @@ git submodule update --init --recursive
 ./tools/buildscripts/build-stellar-blade.ps1
 ```
 
-The script builds `Game__Debug__Win64` and the proxy, then creates a fresh directory
+The default configuration is `Game__Debug__Win64`. For an optimized release build:
+
+```powershell
+./tools/buildscripts/build-stellar-blade.ps1 -Configuration Shipping
+```
+
+Shipping uses `Game__Shipping__Win64`, with compiler optimization and link-time
+optimization, and retains matching PDB symbols. Debug and Shipping use separate
+build directories by default.
+
+The script builds UE4SS and the proxy, then creates a fresh directory
 under `build/packages/` containing `dwmapi.dll`, `ue4ss/UE4SS.dll`, matching PDBs,
 and the Stellar Blade profile merged into current settings. By default the package
 contains no `Mods` directory, so installing an update preserves the user's scripts,
@@ -33,7 +43,8 @@ cache. These options are optional; normal builds fetch upstream's declared depen
 2. Copy the package's `dwmapi.dll` and merge its `ue4ss` folder into `SB/Binaries/Win64`.
    Do not replace the entire installed `ue4ss` folder. The default update package
    intentionally omits `Mods`. Keep the DLL and its matching PDB together.
-3. Launch the game. In `ue4ss/UE4SS.log`, verify `Game__Debug__Win64`, engine 4.26,
+3. Launch the game. In `ue4ss/UE4SS.log`, verify the packaged configuration
+   (`Game__Debug__Win64` or `Game__Shipping__Win64`), engine 4.26,
    the three Lua scan results, completed initialization, and your enabled mods starting.
 4. Check console commands, blueprint mod loading, and loading a save.
    Exercise area transitions and outfit changes with your existing mods.
@@ -43,8 +54,9 @@ UE4SS starts mods enabled in `mods.txt` or carrying an `enabled.txt` marker; a
 folder alone does not enable a mod. Update packages omit `Mods` to preserve the
 installed scripts and load order.
 
-The DLL is an unoptimized debug build with symbols and runtime checks, linked to the
-standard dynamic MSVC runtime used by the project. `DebugBuild = false` and
+Debug builds are unoptimized and include runtime checks; Shipping builds are
+optimized. Both retain symbols and use the project's dynamic MSVC runtime.
+`DebugBuild = false` and
 `Stats = false` describe the **game's** Shipping object layout; they must remain
 false when using a Debug UE4SS DLL. Normal upstream hooks and object caching remain
 available. The graphical debug UI is disabled so UE4SS creates no additional
@@ -134,6 +146,12 @@ After configuring the debug build, run:
 
 ```powershell
 ./tools/tests/run-lua-registry-test.ps1
+```
+
+To test the optimized libraries, select the Shipping build directory:
+
+```powershell
+./tools/tests/run-lua-registry-test.ps1 -BuildDirectory build/stellar-blade-shipping-ninja
 ```
 
 The runner rebuilds LuaMadeSimple and links a native test against the production

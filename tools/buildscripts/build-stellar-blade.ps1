@@ -1,14 +1,17 @@
 #Requires -Version 5.1
 param(
-    [string]$BuildDirectory = 'build/stellar-blade-debug-ninja',
+    [string]$BuildDirectory = '',
     [string]$PackageDirectory = '',
     [string]$DependencySourceDirectory = '',
     [switch]$Offline,
     [switch]$IncludeDefaultMods,
-    [int]$Jobs = 8
+    [int]$Jobs = 8,
+    [ValidateSet('Debug', 'Shipping')][string]$Configuration = 'Debug'
 )
 
 $ErrorActionPreference = 'Stop'
+$taskConfiguration = "Game__${Configuration}__Win64"
+if (-not $BuildDirectory) { $BuildDirectory = "build/stellar-blade-$($Configuration.ToLowerInvariant())-ninja" }
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 Push-Location $taskRoot
 try {
@@ -29,8 +32,8 @@ try {
     $taskBuild = [IO.Path]::GetFullPath($BuildDirectory)
     New-Item -ItemType Directory -Force -Path $taskBuild | Out-Null
     $taskArgs = @('-S', $taskRoot, '-B', $taskBuild, '-G', 'Ninja',
-        '-DCMAKE_BUILD_TYPE=Game__Debug__Win64', '-DUE4SS_TARGET_TYPES=Game',
-        '-DUE4SS_CONFIGURATION_TYPES=Debug', '-DUE4SS_PROJECTS=UE4SS',
+        "-DCMAKE_BUILD_TYPE=$taskConfiguration", '-DUE4SS_TARGET_TYPES=Game',
+        "-DUE4SS_CONFIGURATION_TYPES=$Configuration", '-DUE4SS_PROJECTS=UE4SS',
         '-DENABLE_IDE_SOURCE_VISIBILITY=OFF')
     if ($DependencySourceDirectory) {
         Get-ChildItem -LiteralPath $DependencySourceDirectory -Directory -Filter '*-src' | ForEach-Object {
@@ -41,19 +44,19 @@ try {
     $taskPreviousOffline = $env:CARGO_NET_OFFLINE
     if ($Offline) { $env:CARGO_NET_OFFLINE = 'true' }
     try {
-        Write-Host "Configuring debug build. Log: $taskBuild/configure.log"
+        Write-Host "Configuring $Configuration build. Log: $taskBuild/configure.log"
         & $taskCmake @taskArgs *> "$taskBuild/configure.log"
         if ($LASTEXITCODE) { Get-Content "$taskBuild/configure.log" -Tail 70; throw 'CMake configuration failed.' }
         Write-Host "Building UE4SS and proxy. Log: $taskBuild/build.log"
         & $taskCmake --build $taskBuild --target UE4SS proxy --parallel $Jobs *> "$taskBuild/build.log"
-        if ($LASTEXITCODE) { Get-Content "$taskBuild/build.log" -Tail 70; throw 'Debug build failed.' }
+        if ($LASTEXITCODE) { Get-Content "$taskBuild/build.log" -Tail 70; throw "$Configuration build failed." }
     }
     finally { $env:CARGO_NET_OFFLINE = $taskPreviousOffline }
 
-    if (-not $PackageDirectory) { $PackageDirectory = 'build/packages/StellarBlade-Debug-' + (Get-Date -Format 'yyyyMMdd-HHmmss') }
+    if (-not $PackageDirectory) { $PackageDirectory = "build/packages/StellarBlade-$Configuration-" + (Get-Date -Format 'yyyyMMdd-HHmmss') }
     $taskPackage = [IO.Path]::GetFullPath($PackageDirectory)
     if (Test-Path -LiteralPath $taskPackage) { throw "Package directory already exists; choose a new directory: $taskPackage" }
-    $taskBin = Join-Path $taskBuild 'Game__Debug__Win64/bin'
+    $taskBin = Join-Path $taskBuild "$taskConfiguration/bin"
     # Require symbols before creating an installable package.
     foreach ($taskFile in @('UE4SS.dll', 'UE4SS.pdb', 'dwmapi.dll')) {
         if (-not (Test-Path -LiteralPath (Join-Path $taskBin $taskFile))) { throw "Build output missing: $taskFile" }
@@ -99,7 +102,7 @@ try {
     Copy-Item -LiteralPath 'LICENSE', 'UE4SS.natvis' -Destination $taskPackage
     Copy-Item -LiteralPath 'deps/first/Unreal/UEPseudo.natvis' -Destination $taskPackage
     $taskManifest = [ordered]@{
-        configuration = 'Game__Debug__Win64'
+        configuration = $taskConfiguration
         includesDefaultMods = [bool]$IncludeDefaultMods
         commit = (& git rev-parse HEAD | Out-String).Trim()
         unreal = (& git -C deps/first/Unreal rev-parse HEAD | Out-String).Trim()
@@ -110,6 +113,6 @@ try {
         pdbSha256 = (Get-FileHash "$taskRuntime/UE4SS.pdb" -Algorithm SHA256).Hash
     }
     $taskManifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath "$taskPackage/build-manifest.json" -Encoding UTF8
-    Write-Host "Stellar Blade debug package: $taskPackage"
+    Write-Host "Stellar Blade $Configuration package: $taskPackage"
 }
 finally { Pop-Location }
