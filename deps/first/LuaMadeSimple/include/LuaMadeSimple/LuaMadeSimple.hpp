@@ -193,7 +193,12 @@ namespace RC::LuaMadeSimple
 
           public:
             auto get_lua_instance() const -> const Lua&;
+            // Reference allocation/release are serialized across coroutine registries.
+            // The caller must still own its Lua stack; these helpers do not serialize execution.
             auto make_ref() const -> int32_t;
+            // Preserve the value at stack_index instead of consuming the top value.
+            auto make_ref(int32_t stack_index) const -> int32_t;
+            auto release_ref(int32_t registry_index) const -> void;
             auto get_string_ref(int32_t registry_index) const -> void;
             auto get_number_ref(int32_t registry_index) const -> void;
             auto get_integer_ref(int32_t registry_index) const -> void;

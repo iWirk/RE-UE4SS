@@ -1007,6 +1007,18 @@ namespace RC::UEGenerator
     class LuaTypesGenerator
     {
       private:
+        // Lua identifiers use ASCII. File::StringType contains wide characters on Windows;
+        // passing them to the byte-oriented <cctype> functions is undefined outside UCHAR_MAX.
+        static constexpr auto is_lua_digit(File::CharType c) -> bool
+        {
+            return c >= '0' && c <= '9';
+        }
+
+        static constexpr auto is_lua_identifier_character(File::CharType c) -> bool
+        {
+            return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || is_lua_digit(c);
+        }
+
         auto is_valid_lua_symbol(const File::StringType& str) -> bool
         {
             static const std::set<File::StringType> keywords = {STR("and"),   STR("break"), STR("do"),       STR("else"),   STR("elseif"), STR("end"),
@@ -1018,7 +1030,7 @@ namespace RC::UEGenerator
                 return false;
             }
             auto it = str.begin();
-            if (it == str.end() || std::isdigit(*it))
+            if (it == str.end() || is_lua_digit(*it))
             {
                 // string empty or first char is digit
                 return false;
@@ -1026,7 +1038,7 @@ namespace RC::UEGenerator
             for (; it != str.end(); ++it)
             {
                 auto c = *it;
-                if (c != '_' && !std::isalnum(c))
+                if (!is_lua_identifier_character(c))
                 {
                     // is not underscore or alphanumeric in current locale
                     return false;
@@ -1056,14 +1068,14 @@ namespace RC::UEGenerator
             File::StringType valid;
             valid.reserve(symbol.size());
             auto it = symbol.begin();
-            if (it == symbol.end() || std::isdigit(*it))
+            if (it == symbol.end() || is_lua_digit(*it))
             {
                 valid.push_back('_');
             }
             for (; it != symbol.end(); ++it)
             {
                 auto c = *it;
-                valid.push_back((c == '_' || std::isalnum(c)) ? c : '_');
+                valid.push_back(is_lua_identifier_character(c) ? c : '_');
             }
             return valid;
         }

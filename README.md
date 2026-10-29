@@ -2,6 +2,9 @@
 
 Lua scripting system platform, C++ Modding API, SDK generator, blueprint mod loader, live property editor and other dumping utilities for UE4/5 games.
 
+This fork's Stellar Blade compatibility profile and debug build instructions are in
+[the Stellar Blade port guide](docs/stellar-blade.md).
+
 ## Major features
 
 - [Lua Scripting API](https://docs.ue4ss.com/dev/lua-api.html): Write lua mods based on the UE object system

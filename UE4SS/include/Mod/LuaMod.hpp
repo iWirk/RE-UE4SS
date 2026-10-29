@@ -37,6 +37,7 @@ namespace RC
 
       public:
         LuaMadeSimple::Lua* m_hook_lua = nullptr;
+        int32_t m_hook_lua_thread_ref{LUA_NOREF};
         LuaMadeSimple::Lua* m_main_lua{};
         LuaMadeSimple::Lua* m_async_lua{};
 

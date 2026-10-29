@@ -154,8 +154,15 @@ target_link_libraries(UE4SS PUBLIC
 # Output Configuration
 # ---------------------------------------------------------------------------
 
-# Enable link-time optimization
-set_property(TARGET UE4SS PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)
+# Debug/Dev use /RTC1, which MSVC cannot combine with IPO's /GL.
+# Keep those builds unoptimized and enable IPO only for optimized configurations.
+set_property(TARGET UE4SS PROPERTY INTERPROCEDURAL_OPTIMIZATION OFF)
+foreach(build_config IN LISTS BUILD_CONFIGS)
+    if(build_config MATCHES "__(Shipping|Test)__")
+        string(TOUPPER "${build_config}" upper_build_config)
+        set_property(TARGET UE4SS PROPERTY INTERPROCEDURAL_OPTIMIZATION_${upper_build_config} ${IPO_SUPPORTED})
+    endif()
+endforeach()
 
 # Set runtime library to dynamic CRT (/MD, /MDd)
 # This matches Visual Studio's default, so external mods don't need to set it explicitly.

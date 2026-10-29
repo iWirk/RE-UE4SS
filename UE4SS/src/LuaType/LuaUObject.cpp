@@ -298,7 +298,7 @@ namespace RC::LuaType
                 lua.registry().get_table_ref(lua_table_ref);
                 // The reference was only needed to get the table back here; release it so each call doesn't leave
                 // a registry entry behind that keeps the table (and everything stored in it) alive forever
-                luaL_unref(lua.get_lua_state(), LUA_REGISTRYINDEX, lua_table_ref);
+                lua.registry().release_ref(lua_table_ref);
                 auto lua_table = lua.get_table();
 
                 auto reuse_same_table = param->IsA<Unreal::FArrayProperty>() || param->IsA<Unreal::FStructProperty>() || param->IsA<Unreal::FSetProperty>();

@@ -206,9 +206,28 @@ namespace RC::LuaMadeSimple
         return m_lua_instance;
     }
 
+    // luaL_ref/unref update a shared free list using several Lua API calls.
+    // LuaRaw locks each API call separately, so coroutines need a transaction
+    // lock here even when they use different stacks. Never hold it during a callback.
+    static std::recursive_mutex lua_registry_refs_mutex;
+
     auto Lua::Registry::make_ref() const -> int32_t
     {
+        std::lock_guard guard{lua_registry_refs_mutex};
         return luaL_ref(get_lua_instance().get_lua_state(), LUA_REGISTRYINDEX);
+    }
+
+    auto Lua::Registry::make_ref(int32_t stack_index) const -> int32_t
+    {
+        std::lock_guard guard{lua_registry_refs_mutex};
+        lua_pushvalue(get_lua_instance().get_lua_state(), stack_index);
+        return make_ref();
+    }
+
+    auto Lua::Registry::release_ref(int32_t registry_index) const -> void
+    {
+        std::lock_guard guard{lua_registry_refs_mutex};
+        luaL_unref(get_lua_instance().get_lua_state(), LUA_REGISTRYINDEX, registry_index);
     }
 
     auto Lua::Registry::get_string_ref(int32_t registry_index) const -> void
@@ -252,10 +271,12 @@ namespace RC::LuaMadeSimple
 
     auto Lua::Registry::get_function_ref(int32_t registry_index) const -> void
     {
-        if (get_lua_instance().rawgeti(LUA_REGISTRYINDEX, registry_index) != LUA_TFUNCTION)
+        const auto type = get_lua_instance().rawgeti(LUA_REGISTRYINDEX, registry_index);
+        if (type != LUA_TFUNCTION)
         {
             get_lua_instance().discard_value();
-            get_lua_instance().throw_error("[Lua::Registry::get_function_ref] Ref was not function");
+            get_lua_instance().throw_error(fmt::format("[Lua::Registry::get_function_ref] Ref {} was {}, expected function",
+                                                      registry_index, lua_typename(get_lua_instance().get_lua_state(), type)));
         }
     }
 
